@@ -10,7 +10,7 @@
 
 // Compilation : make
 
-// Exécution : mpirun -n 10 ./FoxMPI matrice1.txt
+// Exécution : mpirun -n 9 ./FoxMPI matrice1.txt
 // Le 2 indique le nombre de processus à faire tourner
 // On indique ensuite sur quel machines on veut faire tourner les processus [facultatif !]
 
@@ -69,7 +69,7 @@ void initGrid(){
 //Va afficher les info du processus de rang "rang" dans le communicateur global
 void printStruct(int rank){
 	
-	if(Me.rank_world == rank){
+	if((Me.rank_world == rank)||(rank == 1000)){
 		printf("---------------------------------------\n");
 		printf("Nombre de processus    : %d\n", G.nbProcessus);
 		printf("Dimension de la grille : %dx%d\n", G.dim, G.dim);
@@ -81,34 +81,40 @@ void printStruct(int rank){
 
 		printf("Coordonnées dans la grille  : [%d,%d]\n", Me.coord_grid[0], Me.coord_grid[1]);
 		printf("Coordonnées dans la ligne   : [%d,%d]\n", Me.coord_row[0], Me.coord_row[1]);
-		printf("Coordonnées dans la colonne : [%d,%d]\n", Me.coord_col[0], Me.coord_col[1]);
-		printf("---------------------------------------\n");
-	}
-	else if(rank == 1000){
-		//Affiche pour tout le monde
-		printf("---------------------------------------\n");
-		printf("Nombre de processus    : %d\n", G.nbProcessus);
-		printf("Dimension de la grille : %dx%d\n", G.dim, G.dim);
-		printf("---------------------------------------\n");
-		printf("Rang global          : %d\n", Me.rank_world);
-		printf("Rang dans la grille  : %d\n", Me.rank_grid);
-		printf("Rang dans la ligne   : %d\n", Me.rank_row);
-		printf("Rang dans la colonne : %d\n\n", Me.rank_col);
+		printf("Coordonnées dans la colonne : [%d,%d]\n\n", Me.coord_col[0], Me.coord_col[1]);
 
-		printf("Coordonnées dans la grille  : [%d,%d]\n", Me.coord_grid[0], Me.coord_grid[1]);
-		printf("Coordonnées dans la ligne   : [%d,%d]\n", Me.coord_row[0], Me.coord_row[1]);
-		printf("Coordonnées dans la colonne : [%d,%d]\n", Me.coord_col[0], Me.coord_col[1]);
+		printf("Valeur de a : %d\n", Me.a);
+		printf("Valeur de b : %d\n", Me.b);
+		printf("Valeur de c : %d\n", Me.c);
 		printf("---------------------------------------\n");
-
 	}
 }
 //-----------------------------------------------------
-void step1(){
+//Permet seulement à initialiser les valeurs a,b et c de tous les processus
+void initValue(){
+	
+	if(Me.coord_grid[0] == Me.coord_grid[1]){
+		
+		Me.a = Me.rank_grid; //Je donne une valeur au pif, ici le rang de grille.
+	}
+	else{
+		Me.a = -1;
+	}
+}
+//-----------------------------------------------------
+void broadcastDiag(){
 
+	for(int k=0;k<G.dim;k++){
+
+		int proc_diag = (Me.coord_col[0]+k)%G.dim;
+		MPI_Bcast(&(Me.a),1,MPI_INT, proc_diag ,G.row_comm); ///On remarque que rank_row = coord_col[0] quand le processus est dans la diagonale !
+		MPI_Barrier(MPI_COMM_WORLD);
+		
+	}
 }
 //-----------------------------------------------------
 void step2(){
-
+	//A COMPLETER AVEC LE SHIFT
 }
 //-----------------------------------------------------
 int main(int argc, char *argv[]){
@@ -120,7 +126,12 @@ int main(int argc, char *argv[]){
 
 	MPI_Init(&argc, &argv); // Initialise  l'environnement MPI
     initGrid(); //Met en place la Grille + d'autres info supplémentaies utiles
-	printStruct(atoi(argv[1])); //Connaitre les infos du processus de rang argv[1]
+	//printStruct(atoi(argv[1])); //Connaitre les infos du processus de rang argv[1]
+
+	initValue();
+
+	broadcastDiag();
+	printStruct(atoi(argv[1]));
 
 	MPI_Finalize(); // cloturer l'environnement MPI
 

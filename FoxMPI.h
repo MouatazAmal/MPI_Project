@@ -17,6 +17,7 @@ typedef struct {
     MPI_Comm grid_comm; //Communicateur GRILLE
     MPI_Comm row_comm;  //Communicateur LIGNE
     MPI_Comm col_comm;  //Communicateur COLONNE
+    int k; 
 } Grid;
 
 //NODE : Structure donnant les infos propre au processus actuel : son rang dans un communicateur donné, ses coordonnées...
@@ -29,8 +30,14 @@ typedef struct {
     int coord_grid[2];  //coordonnées du processus dans G.grid_comm
     int coord_row[2];   //coordonnées du processus dans G.row_comm
     int coord_col[2];   //coordonnées du processus dans G.col_comm
+
+    int a;  //Valeur LOCAL a du processus
+    int b;  //Valeur LOCAL b du processus
+    int c;  //Valeur LOCAL b du processus
 } Node;
 
 //---------------------------------------------------
 void initGrid();
 void printStruct(int rank);
+void initValue();
+void broadcastDiag();
