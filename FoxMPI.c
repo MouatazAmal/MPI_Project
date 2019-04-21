@@ -104,8 +104,8 @@ void initValue(){
 //-----------------------------------------------------
 void broadcastDiag(){
 
-	for(int k=0;k<G.dim;k++){
-
+	int k =0;
+	for(k=0;k<G.dim;k++){
 		int proc_diag = (Me.coord_col[0]+k)%G.dim;
 		MPI_Bcast(&(Me.a),1,MPI_INT, proc_diag ,G.row_comm); ///On remarque que rank_row = coord_col[0] quand le processus est dans la diagonale !
 		MPI_Barrier(MPI_COMM_WORLD);
@@ -113,8 +113,28 @@ void broadcastDiag(){
 	}
 }
 //-----------------------------------------------------
-void step2(){
-	//A COMPLETER AVEC LE SHIFT
+void ShiftOfB(){
+	int received_B;
+
+	int dest = Me.rank_col - 1;
+	if (dest == -1) {
+		dest = G.dim -1;
+	}
+	
+	if (Me.rank_col != ROOT) {
+		MPI_Recv(&received_B, 1, MPI_INT, (Me.rank_col + 1)%G.dim, 0, G.col_comm,MPI_STATUS_IGNORE);
+	}
+
+	MPI_Send(&Me.b, 1, MPI_INT, dest,0, G.col_comm);
+
+	if (Me.rank_col == ROOT) {
+    	MPI_Recv(&received_B, 1, MPI_INT, (Me.rank_col + 1)%G.dim, 0,G.col_comm,MPI_STATUS_IGNORE);
+
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	Me.b = received_B;
+	
 }
 //-----------------------------------------------------
 int main(int argc, char *argv[]){
@@ -131,7 +151,9 @@ int main(int argc, char *argv[]){
 	initValue();
 
 	broadcastDiag();
-	printStruct(atoi(argv[1]));
+	//printStruct(atoi(argv[1]));
+	ShiftOfB();
+	printf("process %d : B = %d\n", Me.rank_col, Me.b);
 
 	MPI_Finalize(); // cloturer l'environnement MPI
 

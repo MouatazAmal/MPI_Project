@@ -89,16 +89,17 @@ int main(int argc, char *argv[]){
 		}
 	MPI_Barrier(MPI_COMM_WORLD);
   	printf("Row: %d / my_rank : %d / lrank : %d / rrank : %d \n", row, gridRank, lRank, rRank);
+  	
   	MPI_Bcast(&A,1,MPI_INT,rRank,line_comm);
   	
   	
   	
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	printf("Rank %d value of %d from process %d\n", gridRank, A, ROOT);
+	//printf("Rank %d value of %d from process %d\n", gridRank, A, ROOT);
 
 
-	  	//printf("Rank %d received %d\n", my_rank, A);
+	printf("Rank %d received %d\n", my_rank, A);
 		
 
 
