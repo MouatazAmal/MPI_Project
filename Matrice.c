@@ -61,3 +61,40 @@ void printMatrix(Matrix M){
    return;
 }
 //----------------------------------------------------
+//Addition de matrice : X + Y = Z
+Matrix addMatrix(Matrix X, Matrix Y){
+    int i,j;
+    Matrix Z;
+
+    Z.Dim = X.Dim;
+
+    for(i=0; i<X.Dim;i++){
+        for(j=0; j<X.Dim;j++){
+            Z.M[i][j] = X.M[i][j] + Y.M[i][j];
+        }
+    }
+    
+   return Z;
+}
+
+//----------------------------------------------------
+//Multiplie les matrices A et B et retourne le résultat
+Matrix multiplyMatrix(Matrix A, Matrix B){
+    
+    int i,j,k;
+    int matrix_dimension = A.Dim; //On suppose que A.Dim = B.Dim
+
+    Matrix C;
+    C.Dim = matrix_dimension;
+
+    for(i=0; i<matrix_dimension;i++){
+        for(j=0; j<matrix_dimension;j++){
+            for(k=0; k<matrix_dimension;k++){
+                C.M[i][j] = C.M[i][j] + A.M[i][k]*A.M[k][j];
+            }
+        }
+    }
+    
+   return C;
+}
+//----------------------------------------------------

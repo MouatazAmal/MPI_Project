@@ -6,8 +6,6 @@
 #include "FoxMPI.h"
 #include "Matrice.h"
 
-#define ROOT 0
-
 // Compilation : make
 
 // Exécution : mpirun -n 9 ./FoxMPI matrice1.txt
@@ -23,7 +21,12 @@ Inspiration : https://github.com/dmitry64/foxmpi/blob/master/main.cpp
 //-----------------------------------------------------
 Grid G; //Grille (2D Torus) de processus
 Node Me;  //Info du Processus actuel
-
+//-----------------------------------------------------
+//Parce-que le modulo de C n'est pas un vrai modulo...
+int mod(int a, int b){
+    int r = a % b;
+    return r < 0 ? r + b : r;
+}
 //-----------------------------------------------------
 //INITGRID : Permet de mettre en place la grille et les différents communicateurs, ainsi que les infos des processus 
 void initGrid(){
@@ -93,99 +96,129 @@ void printStruct(int rank){
 	}
 }
 //-----------------------------------------------------
+//Petite fonction pour broadcaster des matrices. Root va broadcast la matrice X sur le communicateur comm.
+void theMatrixBroadcaster(Matrix X, int root, MPI_Comm comm){
+	int i,j;
+	
+	MPI_Bcast(&X.Dim, 1,MPI_INT, root, comm);
+	MPI_Barrier(comm);
+
+	for(i=0;i<Me.A.Dim;i++){
+		for(j=0;j<Me.A.Dim;j++){
+			MPI_Bcast(&(X.M[i][j]), 1,MPI_INT, root, comm);
+			MPI_Barrier(comm);
+		}
+	}
+
+}
+//-----------------------------------------------------
 //Permet seulement à initialiser les matrices A et B de tous les processus : Le processus maitre (de rang_world = 0) lit les fichiers de matrice et envoie tout ça à tout le monde.
 void initValue(char* filename_A, char* filename_B){
-	
-	//LECTURE DES FICHIERS MATRICES PAR LE MAITRE
 	int i,j;
-	int matrix_dimension = 0;
 
+	//LECTURE DES FICHIERS MATRICES PAR LE MAITRE
 	if(Me.rank_world == 0) {
 		Me.A = createMatrix(filename_A);
 		Me.B = createMatrix(filename_B);
-		matrix_dimension = Me.A.Dim;
 
-		printf("Je suis le Maitre (rang 0) et je vais envoyer la matrice A :\n");
+		/*printf("Je suis le Maitre (rang 0) et je vais envoyer la matrice A :\n");
 		printMatrix(Me.A);
 		printf("Ainsi que B :\n");
-		printMatrix(Me.B);
+		printMatrix(Me.B);*/
 	}
-	MPI_Bcast(&matrix_dimension,1,MPI_INT, 0 ,G.grid_comm);
+	
+	//BROADCAST DE LA MATRICE A
+	MPI_Bcast(&Me.A.Dim,1,MPI_INT, 0 ,G.grid_comm);
 	MPI_Barrier(G.grid_comm);
 
-	//BROADCAST DE LA MATRICE A
-	Me.A.Dim = matrix_dimension;
-	for(i=0;i<matrix_dimension;i++){
-		for(j=0;j<matrix_dimension;j++){
+	for(i=0;i<Me.A.Dim;i++){
+		for(j=0;j<Me.A.Dim;j++){
 			MPI_Bcast(&(Me.A.M[i][j]),1,MPI_INT, 0 ,G.grid_comm);
 			MPI_Barrier(G.grid_comm);
 		}
 	}
 
-	//BROADCAST DE LA MATRICE B
-	Me.B.Dim = matrix_dimension;
-	for(i=0;i<matrix_dimension;i++){
-		for(j=0;j<matrix_dimension;j++){
+//BROADCAST DE LA MATRICE B
+	MPI_Bcast(&Me.B.Dim,1,MPI_INT, 0 ,G.grid_comm);
+	MPI_Barrier(G.grid_comm);
+
+	for(i=0;i<Me.B.Dim;i++){
+		for(j=0;j<Me.B.Dim;j++){
 			MPI_Bcast(&(Me.B.M[i][j]),1,MPI_INT, 0 ,G.grid_comm);
 			MPI_Barrier(G.grid_comm);
 		}
 	}
 
-	//INITIALISATION DE LA MATRICE C
-	Me.C.Dim = matrix_dimension;
+	//INITIALISATION DE C
+	Me.C.Dim = Me.A.Dim;
 
 	//VERIFICATION [FACULTATIF]
-	if(Me.rank_world == 8){
+	/*if(Me.rank_world == 8){
 		printf("\n\n\n<QUELQUES MICRO SECONDES PLUS TARD...>\n\n\n");
 		printf("Bonjour. Je suis l'esclave n°8, et j'ai lu A :\n");
 		printMatrix(Me.A);
 		printf("Ainsi que B :\n");
 		printMatrix(Me.B);
 		printf("Je n'ai pas vérifié mais je pense que mes confrères n°1 à n°7 ont reçu la même chose. Cordialement,\nEsclave n°8\n");
-	}
+	}*/
+
+	MPI_Barrier(G.grid_comm);
+	fflush(stdout);
 	
 }
 //-----------------------------------------------------
-/*void broadcastDiag(int k){
-	int proc_diag = (Me.coord_col[0]+k)%G.dim;
-		MPI_Bcast(&(Me.a),1,MPI_INT, proc_diag ,G.row_comm); ///On remarque que rank_row = coord_col[0] quand le processus est dans la diagonale !
-		MPI_Barrier(MPI_COMM_WORLD);
-}*/
-//-----------------------------------------------------
-void step2(){
-	int received_B;
+//ETAPE 1 : Broadcaster la matrice locale A des processus sur la diagonale k de la grille G, sur leur ligne
+void broadcastDiagonal(int k){
+	int i,j;
+	int rank_processus_diagonal = mod(Me.coord_col[0]+k,G.dim); ///On remarque que rank_row = coord_col[0] quand le processus est dans la diagonale !
 
-	int dest = Me.rank_col - 1;
-	if (dest == -1) {
-		dest = G.dim -1;
+	//BROADCAST DE TOUTE LA MATRICE B
+	for(i=0;i<Me.B.Dim;i++){
+		for(j=0;j<Me.B.Dim;j++){
+			MPI_Bcast(&(Me.B.M[i][j]),1,MPI_INT, rank_processus_diagonal ,G.row_comm);
+			MPI_Barrier(G.grid_comm);
+		}
+	}	
+}
+//-----------------------------------------------------
+void computation(){
+	Matrix mulAB;
+
+	mulAB = multiplyMatrix(Me.A,Me.B);
+	Me.C = addMatrix(Me.C, mulAB);	
+}
+//-----------------------------------------------------
+//Procède au shift de B : Sur une même colonne, Le processus [i,j] envoie sa matrice B à [i-1][j] et recoie celle de[i+1][j]
+void doTheShift(){
+	int i,j;
+
+	//ENVOI/RECEPTION DU B LOCAL
+	int rank_up = mod(Me.rank_col - 1,G.dim);
+	int rank_down = mod(Me.rank_col + 1,G.dim);
+
+	for(i=0;i<Me.B.Dim;i++){
+		for(j=0;j<Me.B.Dim;j++){
+			MPI_Sendrecv_replace(&Me.B.M[i][j], 1, MPI_INT, rank_up, 0, rank_down, 0, G.col_comm, MPI_STATUS_IGNORE);
+			MPI_Barrier(G.grid_comm);
+		}
 	}
 	
-	if (Me.rank_col != ROOT) {
-		MPI_Recv(&received_B, 1, MPI_INT, (Me.rank_col + 1)%G.dim, 0, G.col_comm,MPI_STATUS_IGNORE);
-	}
-
-	MPI_Send(&Me.b, 1, MPI_INT, dest,0, G.col_comm);
-
-	if (Me.rank_col == ROOT) {
-    	MPI_Recv(&received_B, 1, MPI_INT, (Me.rank_col + 1)%G.dim, 0,G.col_comm,MPI_STATUS_IGNORE);
-
-	}
-
-	MPI_Barrier(MPI_COMM_WORLD);
-	Me.b = received_B;
 }
 //-----------------------------------------------------
 int main(int argc, char *argv[]){
+	int k =0;
 
 	//INITIALISATION
 	MPI_Init(&argc, &argv); // Initialise  l'environnement MPI
     initGrid(); //Met en place la Grille + d'autres info supplémentaies utiles
 	initValue(argv[1], argv[2]); //Initialisation des matrices : Tous les processus auront la même matrice A et B
 
-	int k =0;
+	//ALGORITHME DE FOX
 	for(k=0;k<G.dim;k++){
-		broadcastDiag(k);
-		ShiftOfB();
+		broadcastDiagonal(0);
+		computation();
+		doTheShift();
+		printStruct(8);
 	}
 
 	MPI_Finalize(); // cloturer l'environnement MPI

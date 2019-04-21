@@ -6,7 +6,7 @@
 #define MAXSIZE 100
 
 //---------------------------------------------------
-//Définition d'une simple matrice 2D
+//Définition d'une simple matrice carrée qxq
 typedef struct{
     int Dim; //Dimension de la matrice
     int M[MAXSIZE][MAXSIZE]; //La fameuse matrice
@@ -15,6 +15,8 @@ typedef struct{
 //---------------------------------------------------
 Matrix createMatrix(char* filename);
 void printMatrix(Matrix M);
+Matrix addMatrix(Matrix X, Matrix Y);
+Matrix multiplyMatrix(Matrix A, Matrix B);
 
 //---------------------------------------------------
 #endif

@@ -1,3 +1,6 @@
+#ifndef FOXMPI
+#define FOXMPI
+
 #include <stdio.h>
 #include <string.h>
 #include<stdlib.h>
@@ -36,10 +39,17 @@ typedef struct {
     Matrix A;  //Matrice LOCAL A du processus
     Matrix B;  //Matrice LOCAL B du processus
     Matrix C;  //Matrice LOCAL C du processus
+
 } Node;
 
 //---------------------------------------------------
+int mod(int a, int b);
 void initGrid();
 void printStruct(int rank);
 void initValue(char* filename_A, char* filename_B);
-void broadcastDiag();
+
+void broadcastDiagonal(int k);
+void computation();
+void doTheShift();
+
+#endif
