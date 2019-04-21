@@ -146,19 +146,33 @@ void initValue(char* filename_A, char* filename_B){
 	
 }
 //-----------------------------------------------------
-/*void broadcastDiag(){
-	int k;
-	for(k=0;k<G.dim;k++){
-
-		int proc_diag = (Me.coord_col[0]+k)%G.dim;
+/*void broadcastDiag(int k){
+	int proc_diag = (Me.coord_col[0]+k)%G.dim;
 		MPI_Bcast(&(Me.a),1,MPI_INT, proc_diag ,G.row_comm); ///On remarque que rank_row = coord_col[0] quand le processus est dans la diagonale !
 		MPI_Barrier(MPI_COMM_WORLD);
-		
-	}
 }*/
 //-----------------------------------------------------
 void step2(){
-	//A COMPLETER AVEC LE SHIFT
+	int received_B;
+
+	int dest = Me.rank_col - 1;
+	if (dest == -1) {
+		dest = G.dim -1;
+	}
+	
+	if (Me.rank_col != ROOT) {
+		MPI_Recv(&received_B, 1, MPI_INT, (Me.rank_col + 1)%G.dim, 0, G.col_comm,MPI_STATUS_IGNORE);
+	}
+
+	MPI_Send(&Me.b, 1, MPI_INT, dest,0, G.col_comm);
+
+	if (Me.rank_col == ROOT) {
+    	MPI_Recv(&received_B, 1, MPI_INT, (Me.rank_col + 1)%G.dim, 0,G.col_comm,MPI_STATUS_IGNORE);
+
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	Me.b = received_B;
 }
 //-----------------------------------------------------
 int main(int argc, char *argv[]){
@@ -168,9 +182,11 @@ int main(int argc, char *argv[]){
     initGrid(); //Met en place la Grille + d'autres info supplémentaies utiles
 	initValue(argv[1], argv[2]); //Initialisation des matrices : Tous les processus auront la même matrice A et B
 
-	//ALGORITHME DE FOX
-	//broadcastDiag();
-	printStruct(8);
+	int k =0;
+	for(k=0;k<G.dim;k++){
+		broadcastDiag(k);
+		ShiftOfB();
+	}
 
 	MPI_Finalize(); // cloturer l'environnement MPI
 
