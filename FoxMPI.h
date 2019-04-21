@@ -4,6 +4,8 @@
 #include <math.h>
 #include <mpi.h>
 
+#include "Matrice.h"
+
 //---------------------------------------------------
 /*Le but de cet exercice est de permettre de paralléliser la multiplication de 2 matries A et B, en
 utilisant MPI. Il nous faut une grille (2D) de processus qui permettra cette parallélisation.
@@ -31,13 +33,13 @@ typedef struct {
     int coord_row[2];   //coordonnées du processus dans G.row_comm
     int coord_col[2];   //coordonnées du processus dans G.col_comm
 
-    int a;  //Valeur LOCAL a du processus
-    int b;  //Valeur LOCAL b du processus
-    int c;  //Valeur LOCAL b du processus
+    Matrix A;  //Matrice LOCAL A du processus
+    Matrix B;  //Matrice LOCAL B du processus
+    Matrix C;  //Matrice LOCAL C du processus
 } Node;
 
 //---------------------------------------------------
 void initGrid();
 void printStruct(int rank);
-void initValue();
+void initValue(char* filename_A, char* filename_B);
 void broadcastDiag();
