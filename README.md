@@ -168,7 +168,7 @@ La matrice B :
 ~~~~
 
 output : 
-La matrice C :
+La matrice C
 ~~~~
 	18 18 18
 	18 18 18
