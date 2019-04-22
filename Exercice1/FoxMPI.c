@@ -2,26 +2,34 @@
 #include <string.h>
 #include<stdlib.h>
 #include <math.h>
+#include <time.h>
 #include <mpi.h>
 #include "FoxMPI.h"
 #include "Matrice.h"
 
 // Compilation : make
 
-// Exécution : mpirun -n 9 ./FoxMPI matrice1.txt
-// Le 2 indique le nombre de processus à faire tourner
-// On indique ensuite sur quel machines on veut faire tourner les processus [facultatif !]
+// Exécution : mpirun -n 9 ./FoxMPI matrice1.txt matrice2.txt
+// Le 9 indique le nombre de processus à faire tourner
 
 //-----------------------------------------------------
 /*
 Garder en tête que ce main est exécuté par chaque processus de la grille G.
-
-Inspiration : https://github.com/dmitry64/foxmpi/blob/master/main.cpp
 */
 //-----------------------------------------------------
+
+
 Grid G; //Grille (2D Torus) de processus
 Node Me;  //Info du Processus actuel
 Master MeMaster; //Info utile au processus 0 (les autres s'en foutent de cette structure)
+
+//-------------------------------------------------
+//Fonction de chronométrage
+double getTime(){
+	timer = clock();
+	return (double)(timer-timer_start)/CLOCKS_PER_SEC;
+}
+
 //-----------------------------------------------------
 //Parce-que le modulo de C n'est pas un vrai modulo...
 int mod(int a, int b){
@@ -121,8 +129,9 @@ void printStruct(int rank){
 //-----------------------------------------------------
 //Permet seulement à initialiser les matrices A et B de tous les processus : Le processus maitre (de rang_world = 0) lit les fichiers de matrice et envoie tout ça à tout le monde.
 void initValue(char* filename_A, char* filename_B){
-	int i,j,k,l;
-	
+	int i,j,k,l, posx, posy;
+	int error = 0; //Permet une bonne gestion d'erreur (et couper tous les processus si le maitre a trouvé une erreur)
+
 	//LECTURE DES FICHIERS MATRICES PAR LE MAITRE
 	if(Me.rank_world == 0) {
 		//RECUPERATION DES MATRICES
@@ -130,6 +139,25 @@ void initValue(char* filename_A, char* filename_B){
 		MeMaster.B = createMatrix(filename_B);
 		MeMaster.C.Dim = MeMaster.A.Dim;
 
+		//GESTION D'ERREUR
+		if(MeMaster.A.Dim != MeMaster.B.Dim){
+			printf("\nERREUR : Les deux matrices A et B doivent avoir la même DIMENSION.\n\n");
+			error =1;
+		}
+		else if(MeMaster.A.Dim%G.dim != 0){
+			printf("\nERREUR : La dimension des matrices doit être un multiple de la dimension de la grille (=sqrt(nb_processus))\n\n");
+			error =1;
+		}
+	}
+	MPI_Bcast(&error,1,MPI_INT, 0 ,G.grid_comm);
+	MPI_Barrier(G.grid_comm);	
+
+	if(error == 1){
+		MPI_Finalize();
+		exit(0);
+	}						
+				
+	if(Me.rank_world == 0) {
 		MeMaster.bloc_dim = MeMaster.A.Dim/G.dim; //On va répartir le travail à travers tous les processus. Chaque processus va recevoir une sous-matrice de dimension bloc_dim
 		
 		//CREATION D'UNE MATRICE DE SOUS-MATRICES, DE MEME DIMENSION QUE LA GRILLE
@@ -137,6 +165,8 @@ void initValue(char* filename_A, char* filename_B){
 		Matrix repartition_des_taches_B[G.dim][G.dim];
 
 		//Pour chaque bloc de repartition_des_taches...
+		printf("---------------------------------------\n");
+		printf("REPARTITION DES TACHES :\nOn va subdiviser les matrices A et B en sous-matrices, qui seront distribués à travers les processus (exemple pour A ci-dessous): \n");
 		for(i=0;i<G.dim;i++){ 
 			for(j=0;j<G.dim;j++){
 				//...Je construis la sous-matrice de A et B 
@@ -145,12 +175,17 @@ void initValue(char* filename_A, char* filename_B){
 
 				for(k=0;k<MeMaster.bloc_dim;k++){
 					for(l=0;l<MeMaster.bloc_dim;l++){
-						repartition_des_taches_A[i][j].M[k][l] = MeMaster.A.M[k+i*(G.dim-1)][l+j*(G.dim-1)];	
-						repartition_des_taches_B[i][j].M[k][l] = MeMaster.B.M[k+i*(G.dim-1)][l+j*(G.dim-1)];	
+						posy = k+i*MeMaster.bloc_dim; 
+						posx = l+j*MeMaster.bloc_dim;
+						repartition_des_taches_A[i][j].M[k][l] = MeMaster.A.M[posy][posx];	
+						repartition_des_taches_B[i][j].M[k][l] = MeMaster.B.M[posy][posx];	
 					}
 				}
+				printf("Matrice [%d,%d] à envoyer au processus de rang (grile) %d: \n", i,j, i*G.dim+j  );
+				printMatrix(repartition_des_taches_A[i][j]);
 			}
 		}
+		
 
 
 		//ENVOI DES BLOCS A CHAQUE PROCESSUS(1 processus = 1 bloc)
@@ -266,7 +301,7 @@ void restoreAOrigin(){
 //-----------------------------------------------------
 //A cette étape, tous les processus ont fini leur calculs. Il ne reste plus qu'à assembler tous leur bloc pour former la matrice C finale.
 void closureFox(){
-	int i,j,k,l;
+	int i,j,k,l,posx,posy;
 
 	if(Me.rank_world == 0) {
 				
@@ -297,7 +332,9 @@ void closureFox(){
 
 				for(k=0;k<MeMaster.bloc_dim;k++){
 					for(l=0;l<MeMaster.bloc_dim;l++){
-						MeMaster.C.M[k+i*(G.dim-1)][l+j*(G.dim-1)] = repartition_des_taches_C[i][j].M[k][l];
+						posy = k+i*MeMaster.bloc_dim; 
+						posx = l+j*MeMaster.bloc_dim;
+						MeMaster.C.M[posy][posx] = repartition_des_taches_C[i][j].M[k][l];
 					}
 				}
 			}
@@ -321,11 +358,15 @@ void closureFox(){
 int main(int argc, char *argv[]){
 	int k=0;
 
+	timer_start = clock(); //Démarrage du chrono
+
 	//INITIALISATION
 	MPI_Init(&argc, &argv); // Initialise  l'environnement MPI
     initGrid(); //Met en place la Grille + d'autres info supplémentaies utiles
-	initValue(argv[1], argv[2]); //Initialisation des matrices : Tous les processus auront la même matrice A et B
+	double time_init = getTime();
 
+	initValue(argv[1], argv[2]); //Initialisation des matrices : Tous les processus auront la même matrice A et B
+	double time_scatter = getTime();
 
 	//ALGORITHME DE FOX
 	for(k=0;k<G.dim;k++){
@@ -336,9 +377,22 @@ int main(int argc, char *argv[]){
 		doTheShift();
 	}
 
+	double time_fox = getTime();
+
 	//RECUPERATION DES RESULTATS DE TOUS LES PROCESSUS PAR LE MAITRE
 	closureFox();
+	double time_gather = getTime();
+
 	printAllStruct(0);
+
+	if(Me.rank_grid ==0){
+		printf("TEMPS MESURE : \n");
+		printf("Temps d'initialisation :                        %fsec\n", time_init);
+		printf("Temps de distribution des tâches (scatter):     %fsec\n", time_scatter-time_init);
+		printf("Temps de l'algorithme de fox :                  %fsec\n", time_fox-time_scatter);
+		printf("Temps de rassemblement des résultats (gather) : %fsec\n", time_gather-time_fox);
+		printf("TEMPS TOTAL :                                   %fsec\n", time_gather);
+	}
 
 	MPI_Finalize(); // cloturer l'environnement MPI
 	return 0;

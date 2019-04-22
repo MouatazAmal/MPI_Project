@@ -49,7 +49,7 @@ typedef struct {
 typedef struct {
     
     int bloc_dim;
-    
+
     //Seul un bout de matrice est donné ! Si G.dim = A.dim, alors chaque processus ne va gérer qu'une case de matrice (équivalent à dire qu'il va gérer une matrice 1x1)
     Matrix A;  //Matrice LOCAL & COMPLETE A du processus
     Matrix B;  //Matrice LOCAL & COMPLETE B du processus
@@ -57,7 +57,12 @@ typedef struct {
 
 } Master;
 
+//Permet le chronométrage
+clock_t timer_start;
+clock_t timer;
+
 //---------------------------------------------------
+double getTime();
 int mod(int a, int b);
 void initGrid();
 void printAllStruct(int rank);

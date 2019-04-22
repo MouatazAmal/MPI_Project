@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "Matrice.h"
 
 //-----------------------------------------------------
 //Va créer une matrice à partir d'un fichier (cf matrice1.txt)
 Matrix createMatrix(char* filename){
     char ch;
+    char str[3];
     FILE *fp;
     fp = fopen(filename, "r"); 
  
@@ -17,10 +19,14 @@ Matrix createMatrix(char* filename){
 
     Matrix M;
 
-    if((ch = fgetc(fp)) != EOF){
-        M.Dim = ch  - '0'; //La première ligne du fichier donne la dimension de la matrice
+    if(fgets (str, 3, fp) != NULL){
+        M.Dim = atoi(str); //La première ligne du fichier donne la dimension de la matrice
+
         int i=0,j=0;
-        ch = fgetc(fp);
+
+        while ((ch <= '0')&&(ch >= '9')){
+            ch = fgetc(fp);
+        }
 
         while((ch = fgetc(fp)) != EOF){
             
@@ -45,6 +51,23 @@ Matrix createMatrix(char* filename){
    fclose(fp);
    return M;
 }
+//----------------------------------------------------
+Matrix generateMatrix(int dim){
+    Matrix M;
+    int i,j;
+
+    M.Dim = dim;
+    srand(time(NULL));
+
+    for(i=0; i<M.Dim;i++){
+        for(j=0; j<M.Dim;j++){
+            M.M[i][j] = rand()%9 ;
+        }
+    }
+    
+   return M;
+}
+
 //----------------------------------------------------
 //Affichage de la matrice M
 void printMatrix(Matrix M){

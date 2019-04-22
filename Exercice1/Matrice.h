@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#define MAXSIZE 100
+#define MAXSIZE 200
 
 //---------------------------------------------------
 //Définition d'une simple matrice carrée qxq
@@ -14,6 +14,7 @@ typedef struct{
 
 //---------------------------------------------------
 Matrix createMatrix(char* filename);
+Matrix generateMatrix(int dim);
 void printMatrix(Matrix M);
 Matrix addMatrix(Matrix X, Matrix Y);
 void initMatrix(Matrix A);
