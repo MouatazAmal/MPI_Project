@@ -59,6 +59,7 @@ void initValue(){
 	Me.c = 0;
 }
 
+// réalise un shift Horizontal de la variable a d'un cramp à gauche
 void shiftA(){
 
 	if (Me.coord_grid[0] >= 1){
@@ -73,6 +74,8 @@ void shiftA(){
 
 }
 
+
+// réalise un shift vertical de la variable b d'un cramp vers le haut
 void shiftB(){
 
 	if (Me.coord_grid[1] >= 1){
@@ -87,6 +90,7 @@ void shiftB(){
 
 }
 
+//en fonction de la position du processeurs dans la grille, la fonction réalise un nombre de shift de A vers la gauche
 void matrixpreskewingA(){
 
     int i = 1;  
@@ -99,6 +103,7 @@ void matrixpreskewingA(){
 
 }
 
+//en fonction de la position du processeurs dans la grille, la fonction réalise un nombre de shift de B vers le haut
 void matrixpreskewingB(){
 
     int i = 1;  

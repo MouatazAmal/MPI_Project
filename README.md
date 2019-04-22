@@ -1,6 +1,9 @@
 # Projet MPI
 
-## Première partie : Fox Algorithm [Manal]
+# Authors 
+	> Manal BENAISSA
+	> Mouataz AMAL
+## Première partie : Fox Algorithm
 L'algorithme de Fox est COMPLETEMENT implémentée. L'implémentation de la gestion de mémoire (exercice 3) et l'analyse (exercie 4) ont été faites aussi pour cet algorithme.
 
 ### Compilation/Exécution
@@ -130,4 +133,44 @@ TEMPS TOTAL :               0.000573sec
 
 Il aurait été plus intéressant de tester avec des matrices bien plus grandes (50x50 minimum, 1000x1000 dans l'idéal), mais nos machines/codes ne l'ont pas permis (nous manquions de temps pour paufiner les analyses)
 
-## Deuxième partie : Cannon Matrix product algorithm [Mouataz]
+
+
+## Deuxième partie : Cannon Matrix product algorithm
+
+Dans cet exercice nous avons mis en place l’algorithme, cependant dans notre programme chaque processeur de la grille ne prends en compte qu’une valeur et pas de matrices.
+
+
+### Pour compiler : 
+	exécuter le makefile dans le répertoire Exercices2/
+	> make
+
+### Pour exécuter :
+	>  mpirun -n <NB_PROCESSUS> ./CannonAlgo
+
+### Optimisations : 
+L’optimisation que nous aurions pu ajouter est la gestion des matrices par les processeurs de la grille.
+
+### Exemple : 
+Nous avons exécuté notre programme avec 9 processeurs.
+La grille est de dimensions [3,3]
+La matrice A :
+~~~~
+	2 2 2
+	2 2 2
+	2 2 2
+~~~~
+
+La matrice B :
+~~~~
+	3 3 3
+	3 3 3
+	3 3 3
+~~~~
+
+output : 
+La matrice C :
+~~~~
+	18 18 18
+	18 18 18
+	18 18 18
+~~~~
