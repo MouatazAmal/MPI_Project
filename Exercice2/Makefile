@@ -1,9 +1,4 @@
 
-#all : FoxMPI
-
-#FoxMPI : FoxMPI.o Matrice.o
-#	mpicc FoxMPI.o Matrice.o -o FoxMPI -lm
-
 all : CannonAlgo
 
 
