@@ -1,5 +1,7 @@
 # Projet MPI
 
+Lien Github : https://github.com/MouatazAmal/MPI_Project
+
 # Authors 
 	> Manal BENAISSA
 	> Mouataz AMAL
@@ -174,3 +176,5 @@ La matrice C
 	18 18 18
 	18 18 18
 ~~~~
+En effet nous remarquons Que le résultat est égal à 18 sois 2x3 + 2x3 + 2x3.
+Nous concluons que l'algorithme réalise le produit matricielle des deux matrices A et B.
