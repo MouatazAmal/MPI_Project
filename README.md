@@ -1,7 +1,7 @@
 # Projet MPI
 
 ## Première partie : Fox Algorithm
-L'algorithme de FOx est COMPLETEMENT implémentée (je verrais plus tard pour les optimisations)
+L'algorithme de Fox est COMPLETEMENT implémentée (je verrais plus tard pour les optimisations)
 
 Pour compiler :
 > make
@@ -15,8 +15,11 @@ Il suffit de donner en paramètre deux fichiers de matrices. Ces fichiers doiven
 
 Exemple :
 >3
+>
 >1 2 3
+>
 >4 5 6
+>
 >7 8 9
 
 ATTENTION : 
