@@ -36,20 +36,37 @@ typedef struct {
     int coord_row[2];   //coordonnées du processus dans G.row_comm
     int coord_col[2];   //coordonnées du processus dans G.col_comm
 
-    Matrix A;  //Matrice LOCAL A du processus
-    Matrix B;  //Matrice LOCAL B du processus
-    Matrix C;  //Matrice LOCAL C du processus
+    Matrix a;   //SOUS-Matrice LOCAL a du processus
+    Matrix b;   //SOUS-Matrice LOCAL b du processus
+    Matrix c;   //SOUS-Matrice LOCAL c du processus
+
+    Matrix origin_a; //La matrice a (ci-dessus) sera écrasée lors du broadcast, il faut garder une petite sauvegarde !
+
 
 } Node;
+
+//MASTER : Toutes les infos propre au processus 0, qui se charge entre autre de récupérer/diviser les matrices
+typedef struct {
+    
+    int bloc_dim;
+    
+    //Seul un bout de matrice est donné ! Si G.dim = A.dim, alors chaque processus ne va gérer qu'une case de matrice (équivalent à dire qu'il va gérer une matrice 1x1)
+    Matrix A;  //Matrice LOCAL & COMPLETE A du processus
+    Matrix B;  //Matrice LOCAL & COMPLETE B du processus
+    Matrix C;  //Matrice LOCAL & COMPLETE C du processus
+
+} Master;
 
 //---------------------------------------------------
 int mod(int a, int b);
 void initGrid();
+void printAllStruct(int rank);
 void printStruct(int rank);
 void initValue(char* filename_A, char* filename_B);
 
 void broadcastDiagonal(int k);
 void computation();
 void doTheShift();
+void restoreAOrigin();
 
 #endif

@@ -21,6 +21,7 @@ Inspiration : https://github.com/dmitry64/foxmpi/blob/master/main.cpp
 //-----------------------------------------------------
 Grid G; //Grille (2D Torus) de processus
 Node Me;  //Info du Processus actuel
+Master MeMaster; //Info utile au processus 0 (les autres s'en foutent de cette structure)
 //-----------------------------------------------------
 //Parce-que le modulo de C n'est pas un vrai modulo...
 int mod(int a, int b){
@@ -70,8 +71,8 @@ void initGrid(){
 }
 //-----------------------------------------------------
 //Va afficher les info du processus de rang "rang" dans le communicateur global
-void printStruct(int rank){
-	
+void printAllStruct(int rank){
+		
 	if((Me.rank_world == rank)||(rank == 1000)){
 		printf("---------------------------------------\n");
 		printf("Nombre de processus    : %d\n", G.nbProcessus);
@@ -86,81 +87,127 @@ void printStruct(int rank){
 		printf("Coordonnées dans la ligne   : [%d,%d]\n", Me.coord_row[0], Me.coord_row[1]);
 		printf("Coordonnées dans la colonne : [%d,%d]\n\n", Me.coord_col[0], Me.coord_col[1]);
 
+		//Cette partie sert surtout au maitre, se sont les matrices COMPLETES
 		printf("Valeur de A :\n");
-		printMatrix(Me.A);
+		printMatrix(MeMaster.A);
 		printf("Valeur de B :\n");
-		printMatrix(Me.B);
+		printMatrix(MeMaster.B);
 		printf("Valeur de C :\n");
-		printMatrix(Me.C);
+		printMatrix(MeMaster.C);
 		printf("---------------------------------------\n");
+		
 	}
 }
 //-----------------------------------------------------
-//Petite fonction pour broadcaster des matrices. Root va broadcast la matrice X sur le communicateur comm.
-void theMatrixBroadcaster(Matrix X, int root, MPI_Comm comm){
-	int i,j;
-	
-	MPI_Bcast(&X.Dim, 1,MPI_INT, root, comm);
-	MPI_Barrier(comm);
+//Va afficher les info du processus de rang "rang" dans le communicateur global
+void printStruct(int rank){
+		
+	if((Me.rank_world == rank)||(rank == 1000)){
+		printf("---------------------------------------\n");
+		printf("Rang global          : %d\n", Me.rank_world);
 
-	for(i=0;i<Me.A.Dim;i++){
-		for(j=0;j<Me.A.Dim;j++){
-			MPI_Bcast(&(X.M[i][j]), 1,MPI_INT, root, comm);
-			MPI_Barrier(comm);
-		}
+		//Cette partie sert à tous les processus : se sont les fameux blocs pour les calculs !
+		printf("Valeur de a :\n");
+		printMatrix(Me.a);
+		printf("Valeur de b :\n");
+		printMatrix(Me.b);
+		printf("Valeur de c :\n");
+		printMatrix(Me.c);
+
+		printf("---------------------------------------\n");
+		
 	}
-
 }
 //-----------------------------------------------------
 //Permet seulement à initialiser les matrices A et B de tous les processus : Le processus maitre (de rang_world = 0) lit les fichiers de matrice et envoie tout ça à tout le monde.
 void initValue(char* filename_A, char* filename_B){
-	int i,j;
-
+	int i,j,k,l;
+	
 	//LECTURE DES FICHIERS MATRICES PAR LE MAITRE
 	if(Me.rank_world == 0) {
-		Me.A = createMatrix(filename_A);
-		Me.B = createMatrix(filename_B);
+		//RECUPERATION DES MATRICES
+		MeMaster.A = createMatrix(filename_A);
+		MeMaster.B = createMatrix(filename_B);
+		MeMaster.C.Dim = MeMaster.A.Dim;
 
-		/*printf("Je suis le Maitre (rang 0) et je vais envoyer la matrice A :\n");
-		printMatrix(Me.A);
-		printf("Ainsi que B :\n");
-		printMatrix(Me.B);*/
+		MeMaster.bloc_dim = MeMaster.A.Dim/G.dim; //On va répartir le travail à travers tous les processus. Chaque processus va recevoir une sous-matrice de dimension bloc_dim
+		
+		//CREATION D'UNE MATRICE DE SOUS-MATRICES, DE MEME DIMENSION QUE LA GRILLE
+		Matrix repartition_des_taches_A[G.dim][G.dim];
+		Matrix repartition_des_taches_B[G.dim][G.dim];
+
+		//Pour chaque bloc de repartition_des_taches...
+		for(i=0;i<G.dim;i++){ 
+			for(j=0;j<G.dim;j++){
+				//...Je construis la sous-matrice de A et B 
+				repartition_des_taches_A[i][j].Dim = MeMaster.bloc_dim;
+				repartition_des_taches_B[i][j].Dim = MeMaster.bloc_dim;
+
+				for(k=0;k<MeMaster.bloc_dim;k++){
+					for(l=0;l<MeMaster.bloc_dim;l++){
+						repartition_des_taches_A[i][j].M[k][l] = MeMaster.A.M[k+i*(G.dim-1)][l+j*(G.dim-1)];	
+						repartition_des_taches_B[i][j].M[k][l] = MeMaster.B.M[k+i*(G.dim-1)][l+j*(G.dim-1)];	
+					}
+				}
+			}
+		}
+
+
+		//ENVOI DES BLOCS A CHAQUE PROCESSUS(1 processus = 1 bloc)
+		for(i=0;i<G.dim;i++){
+			for(j=0;j<G.dim;j++){
+				if(i+j != 0){
+					
+					//ENVOI DIMENSION
+					Me.a.Dim = repartition_des_taches_A[i][j].Dim;
+					MPI_Send(&(Me.a.Dim), 1, MPI_INT, i*G.dim+j, 0, G.grid_comm);
+
+					Me.b.Dim = repartition_des_taches_B[i][j].Dim;
+					MPI_Send(&(Me.b.Dim), 1, MPI_INT, i*G.dim+j, 0, G.grid_comm);
+
+					//ENVOI BLOC
+					for(k=0;k<Me.a.Dim;k++){
+						for(l=0;l<Me.a.Dim;l++){
+							Me.a.M[k][l] = repartition_des_taches_A[i][j].M[k][l];
+							MPI_Send(&(Me.a.M[k][l]), 1, MPI_INT, i*G.dim+j, 0, G.grid_comm);
+
+							Me.b.M[k][l] = repartition_des_taches_B[i][j].M[k][l];
+							MPI_Send(&(Me.b.M[k][l]), 1, MPI_INT, i*G.dim+j, 0, G.grid_comm);
+
+						}
+					}
+				}
+			}
+		}
+
+		//LE MAITRE RESTITUE SON BLOC A LUI
+		Me.origin_a.Dim = Me.a.Dim;
+
+		for(k=0;k<Me.a.Dim;k++){
+			for(l=0;l<Me.a.Dim;l++){
+				Me.a.M[k][l] = repartition_des_taches_A[0][0].M[k][l];
+				Me.origin_a.M[k][l] = Me.a.M[k][l];
+				Me.b.M[k][l] = repartition_des_taches_B[0][0].M[k][l];
+			}
+		}
+
 	}
-	
-	//BROADCAST DE LA MATRICE A
-	MPI_Bcast(&Me.A.Dim,1,MPI_INT, 0 ,G.grid_comm);
-	MPI_Barrier(G.grid_comm);
 
-	for(i=0;i<Me.A.Dim;i++){
-		for(j=0;j<Me.A.Dim;j++){
-			MPI_Bcast(&(Me.A.M[i][j]),1,MPI_INT, 0 ,G.grid_comm);
-			MPI_Barrier(G.grid_comm);
+	else{
+		MPI_Recv(&(Me.a.Dim), 1, MPI_INT, 0, 0, G.grid_comm, MPI_STATUS_IGNORE);
+		MPI_Recv(&(Me.b.Dim), 1, MPI_INT, 0, 0, G.grid_comm, MPI_STATUS_IGNORE);
+		Me.origin_a.Dim = Me.a.Dim;
+
+		for(k=0;k<Me.a.Dim;k++){
+			for(l=0;l<Me.a.Dim;l++){
+				MPI_Recv(&(Me.a.M[k][l]), 1, MPI_INT, 0, 0, G.grid_comm, MPI_STATUS_IGNORE);
+				MPI_Recv(&(Me.b.M[k][l]), 1, MPI_INT, 0, 0, G.grid_comm, MPI_STATUS_IGNORE);
+				Me.origin_a.M[k][l] = Me.a.M[k][l];
+			}
 		}
 	}
 
-//BROADCAST DE LA MATRICE B
-	MPI_Bcast(&Me.B.Dim,1,MPI_INT, 0 ,G.grid_comm);
-	MPI_Barrier(G.grid_comm);
-
-	for(i=0;i<Me.B.Dim;i++){
-		for(j=0;j<Me.B.Dim;j++){
-			MPI_Bcast(&(Me.B.M[i][j]),1,MPI_INT, 0 ,G.grid_comm);
-			MPI_Barrier(G.grid_comm);
-		}
-	}
-
-	//INITIALISATION DE C
-	Me.C.Dim = Me.A.Dim;
-
-	//VERIFICATION [FACULTATIF]
-	/*if(Me.rank_world == 8){
-		printf("\n\n\n<QUELQUES MICRO SECONDES PLUS TARD...>\n\n\n");
-		printf("Bonjour. Je suis l'esclave n°8, et j'ai lu A :\n");
-		printMatrix(Me.A);
-		printf("Ainsi que B :\n");
-		printMatrix(Me.B);
-		printf("Je n'ai pas vérifié mais je pense que mes confrères n°1 à n°7 ont reçu la même chose. Cordialement,\nEsclave n°8\n");
-	}*/
+	Me.c.Dim = Me.a.Dim;
 
 	MPI_Barrier(G.grid_comm);
 	fflush(stdout);
@@ -172,20 +219,22 @@ void broadcastDiagonal(int k){
 	int i,j;
 	int rank_processus_diagonal = mod(Me.coord_col[0]+k,G.dim); ///On remarque que rank_row = coord_col[0] quand le processus est dans la diagonale !
 
-	//BROADCAST DE TOUTE LA MATRICE B
-	for(i=0;i<Me.B.Dim;i++){
-		for(j=0;j<Me.B.Dim;j++){
-			MPI_Bcast(&(Me.B.M[i][j]),1,MPI_INT, rank_processus_diagonal ,G.row_comm);
+	//BROADCAST DE TOUTE LA MATRICE A
+	for(i=0;i<Me.a.Dim;i++){
+		for(j=0;j<Me.a.Dim;j++){
+			MPI_Bcast(&(Me.a.M[i][j]),1,MPI_INT, rank_processus_diagonal ,G.row_comm);
 			MPI_Barrier(G.grid_comm);
 		}
 	}	
 }
 //-----------------------------------------------------
+//ETAPE 2 : Le calcul...
 void computation(){
 	Matrix mulAB;
 
-	mulAB = multiplyMatrix(Me.A,Me.B);
-	Me.C = addMatrix(Me.C, mulAB);	
+	mulAB = multiplyMatrix(Me.a,Me.b);
+	Me.c = addMatrix(Me.c, mulAB);	
+
 }
 //-----------------------------------------------------
 //Procède au shift de B : Sur une même colonne, Le processus [i,j] envoie sa matrice B à [i-1][j] et recoie celle de[i+1][j]
@@ -196,31 +245,102 @@ void doTheShift(){
 	int rank_up = mod(Me.rank_col - 1,G.dim);
 	int rank_down = mod(Me.rank_col + 1,G.dim);
 
-	for(i=0;i<Me.B.Dim;i++){
-		for(j=0;j<Me.B.Dim;j++){
-			MPI_Sendrecv_replace(&Me.B.M[i][j], 1, MPI_INT, rank_up, 0, rank_down, 0, G.col_comm, MPI_STATUS_IGNORE);
+	for(i=0;i<Me.b.Dim;i++){
+		for(j=0;j<Me.b.Dim;j++){
+			MPI_Sendrecv_replace(&Me.b.M[i][j], 1, MPI_INT, rank_up, 0, rank_down, 0, G.col_comm, MPI_STATUS_IGNORE); //Cette fonction est magique.
 			MPI_Barrier(G.grid_comm);
 		}
 	}
 	
 }
 //-----------------------------------------------------
+//Permet juste de restaurer les vraies valeurs de la matrice a, avant le broadcast. En effet, après broadcast, l'ancienne valeur de a est perdue.
+void restoreAOrigin(){
+	int i,j;
+	for(i=0;i<Me.a.Dim;i++){
+		for(j=0;j<Me.a.Dim;j++){
+			Me.a.M[i][j] = Me.origin_a.M[i][j];
+		}
+	}
+}
+//-----------------------------------------------------
+//A cette étape, tous les processus ont fini leur calculs. Il ne reste plus qu'à assembler tous leur bloc pour former la matrice C finale.
+void closureFox(){
+	int i,j,k,l;
+
+	if(Me.rank_world == 0) {
+				
+		//CREATION D'UNE MATRICE DE SOUS-MATRICES, DE MEME DIMENSION QUE LA GRILLE, POUR RECUPERER LES RESULTATS
+		Matrix repartition_des_taches_C[G.dim][G.dim];
+
+		//RECEPTION DE TOUS LES RESULTATS
+		for(i=0;i<G.dim;i++){ 
+			for(j=0;j<G.dim;j++){
+
+				for(k=0;k<Me.a.Dim;k++){
+					for(l=0;l<Me.a.Dim;l++){
+						if(i+j != 0){
+							MPI_Recv(&(Me.c.M[k][l]), 1, MPI_INT, i*G.dim+j, 0, G.grid_comm, MPI_STATUS_IGNORE);
+						}
+						repartition_des_taches_C[i][j].M[k][l] = Me.c.M[k][l];
+						
+					}
+				}
+
+			}
+		}
+
+		//Pour chaque bloc de repartition_des_taches...
+		for(i=0;i<G.dim;i++){ 
+			for(j=0;j<G.dim;j++){
+				//...Je reconstruis la matrice de C 
+
+				for(k=0;k<MeMaster.bloc_dim;k++){
+					for(l=0;l<MeMaster.bloc_dim;l++){
+						MeMaster.C.M[k+i*(G.dim-1)][l+j*(G.dim-1)] = repartition_des_taches_C[i][j].M[k][l];
+					}
+				}
+			}
+		}
+
+	}
+	else{
+		//Ce qu'envoient les autres processus (leur sous-matrice Me.c)
+		for(k=0;k<Me.c.Dim;k++){
+			for(l=0;l<Me.c.Dim;l++){
+					MPI_Send(&(Me.c.M[k][l]), 1, MPI_INT, 0, 0, G.grid_comm);
+
+			}
+		}
+	}
+	MPI_Barrier(G.grid_comm);
+
+
+}
+//-----------------------------------------------------
 int main(int argc, char *argv[]){
-	int k =0;
+	int k=0;
 
 	//INITIALISATION
 	MPI_Init(&argc, &argv); // Initialise  l'environnement MPI
     initGrid(); //Met en place la Grille + d'autres info supplémentaies utiles
 	initValue(argv[1], argv[2]); //Initialisation des matrices : Tous les processus auront la même matrice A et B
 
+
 	//ALGORITHME DE FOX
 	for(k=0;k<G.dim;k++){
-		broadcastDiagonal(0);
+		//RESTAURATION DU a D'ORIGINE
+		restoreAOrigin();
+		broadcastDiagonal(k);
 		computation();
 		doTheShift();
-		printStruct(8);
 	}
 
+	//RECUPERATION DES RESULTATS DE TOUS LES PROCESSUS PAR LE MAITRE
+	closureFox();
+	printAllStruct(0);
+
 	MPI_Finalize(); // cloturer l'environnement MPI
+	return 0;
 
 }

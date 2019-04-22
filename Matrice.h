@@ -16,6 +16,7 @@ typedef struct{
 Matrix createMatrix(char* filename);
 void printMatrix(Matrix M);
 Matrix addMatrix(Matrix X, Matrix Y);
+void initMatrix(Matrix A);
 Matrix multiplyMatrix(Matrix A, Matrix B);
 
 //---------------------------------------------------

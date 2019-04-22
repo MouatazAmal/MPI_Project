@@ -78,20 +78,32 @@ Matrix addMatrix(Matrix X, Matrix Y){
 }
 
 //----------------------------------------------------
+void initMatrix(Matrix A){
+    int i,j;
+    for(i=0; i<A.Dim;i++){
+        for(j=0; j<A.Dim;j++){
+            A.M[i][j] = 0;
+        }
+    }
+}
+//----------------------------------------------------
 //Multiplie les matrices A et B et retourne le résultat
 Matrix multiplyMatrix(Matrix A, Matrix B){
     
-    int i,j,k;
+    int i,j,k, sum =0;
     int matrix_dimension = A.Dim; //On suppose que A.Dim = B.Dim
 
     Matrix C;
     C.Dim = matrix_dimension;
+    initMatrix(C);
 
     for(i=0; i<matrix_dimension;i++){
         for(j=0; j<matrix_dimension;j++){
             for(k=0; k<matrix_dimension;k++){
-                C.M[i][j] = C.M[i][j] + A.M[i][k]*A.M[k][j];
+                sum = sum + A.M[i][k]*B.M[k][j];
             }
+            C.M[i][j] = sum;
+            sum =0;
         }
     }
     
